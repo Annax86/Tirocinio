@@ -1,53 +1,44 @@
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 from pynput import keyboard
 
-# Connessione al simulatore
-client = RemoteAPIClient()
-sim = client.getObject('sim')
-
-# Ottieni l'handle dell'oggetto
-target = sim.getObject('/Quadcopter_target')
-step = 0.05 
-
-# Apri la console di debug in CoppeliaSim
-console_handle = sim.auxiliaryConsoleOpen("Coordinate Drone", 10, 2)
-
-print("Controllo attivo: Frecce (XY), W/S (Z), Q (Esci)")
-
-def on_press(key):
-    try:
-        # Movimenti
-        if key == keyboard.Key.up:
-            sim.setObjectPosition(target, target, (step, 0, 0))
-        elif key == keyboard.Key.down:
-            sim.setObjectPosition(target, target, (-step, 0, 0))
-        elif key == keyboard.Key.left:
-            sim.setObjectPosition(target, target, (0, -step, 0))
-        elif key == keyboard.Key.right:
-            sim.setObjectPosition(target, target, (0, step, 0))
-        elif hasattr(key, 'char'):
-            if key.char == 'w':
-                sim.setObjectPosition(target, target, (0, 0, step))
-            elif key.char == 's':
-                sim.setObjectPosition(target, target, (0, 0, -step))
-
-        # --- PARTE AGGIUNTA PER LE COORDINATE ---
-        # Leggiamo la posizione rispetto al 'mondo' (coordinate assolute della scena)
-        pos = sim.getObjectPosition(target, sim.handle_world)
+class Drone_Controller:
+    def __init__(self):
+        self.sim = RemoteAPIClient().getObject('sim')
+        self.drone = self.sim.getObject('/Quadcopter_target')
         
-        # Formattiamo la stringa
-        coord_text = f"X: {pos[0]:.3f} | Y: {pos[1]:.3f} | Z: {pos[2]:.3f}"
+        # Costanti di volo
+        self.STEP_MOVE = 0.05
+        self.STEP_YAW = 0.1
+        self.ALT_DECOLLO = 1.0
         
-        # Stampiamo sul terminale Python
-        print(f"Nuova posizione: {coord_text}")
-        
-        # Stampiamo sulla console di CoppeliaSim
-        sim.auxiliaryConsolePrint(console_handle, f"{coord_text}\n")
-        # ----------------------------------------
+        print("--- Sistema Pronto ---")
+        print("Comandi: Frecce (XY), W/S (Z), A/D (Yaw), T/G (Decollo/Atterraggio), Q (Esci)")
 
-    except Exception as e:
-        print(f"Errore: {e}")
+    def comandi(self, key):
+        try:
+            # Movimenti e Rotazioni
+            if key == keyboard.Key.up: self.sim.setObjectPosition(self.drone, self.drone, (self.STEP_MOVE, 0, 0))
+            elif key == keyboard.Key.down: self.sim.setObjectPosition(self.drone, self.drone, (-self.STEP_MOVE, 0, 0))
+            elif key == keyboard.Key.left: self.sim.setObjectPosition(self.drone, self.drone, (0, -self.STEP_MOVE, 0))
+            elif key == keyboard.Key.right: self.sim.setObjectPosition(self.drone, self.drone, (0, self.STEP_MOVE, 0))
+            elif hasattr(key, 'char'):
+                if key.char == 'w': self.sim.setObjectPosition(self.drone, self.drone, (0, 0, self.STEP_MOVE))
+                elif key.char == 's': self.sim.setObjectPosition(self.drone, self.drone, (0, 0, -self.STEP_MOVE))
+                elif key.char == 'a': self.sim.setObjectOrientation(self.drone, self.drone, (0, 0, self.STEP_YAW))
+                elif key.char == 'd': self.sim.setObjectOrientation(self.drone, self.drone, (0, 0, -self.STEP_YAW))
+                elif key.char == 't': self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, self.ALT_DECOLLO))
+                elif key.char == 'g': self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, 0.05))
+                elif key.char == 'q': return False
+            
+            # Feedback posizione su terminale
+            pos = self.sim.getObjectPosition(self.drone, self.sim.handle_world)
+            print(f"X:{pos[0]:.2f} | Y:{pos[1]:.2f} | Z:{pos[2]:.2f}     ", end='\r')
+        except: 
+            pass
 
-# Listener tastiera
-with keyboard.Listener(on_press=on_press) as listener:
-    listener.join()
+    def run(self):
+        with keyboard.Listener(on_press=self.comandi) as listener:
+            listener.join()
+
+if __name__ == "__main__":
+    Drone_Controller().run()
