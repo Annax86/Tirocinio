@@ -1,22 +1,30 @@
+import math
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 from pynput import keyboard
 
-class Drone_Controller:
+class DJI_Mini3_GeoController:
     def __init__(self):
-        self.sim = RemoteAPIClient().getObject('sim')
+        
+        # Connessione al simulatore
+        self.client = RemoteAPIClient()
+        self.sim = self.client.getObject('sim')
         self.drone = self.sim.getObject('/Quadcopter_target')
         
-        # Coordinate di riferimento (Lat/Lon di partenza)
-        self.ref_lat = 45.4642  
-        self.ref_lon = 9.1900
-        # Conversione: 1 metro ~ 0.000009 gradi (approssimazione su 111km)
-        self.meters_to_degrees = 1 / 111000 
+        # Reset al centro (0, 0, 0.05) per evitare compenetrazioni col suolo
+        self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, 0.05))
+        self.sim.setObjectOrientation(self.drone, self.sim.handle_world, (0, 0, 0))
         
+        # Costanti Geodetiche (WGS84)
+        self.ref_lat = 0.0
+        self.ref_lon = 0.0
+        self.LAT_METERS_PER_DEG = 111319.9
+        
+        # Costanti di volo
         self.STEP_MOVE = 0.05
         self.STEP_YAW = 0.1
         self.ALT_DECOLLO = 1.0
         
-        print("--- Sistema Navigazione Geografica Pronto ---")
+        print("--- Sistema di Navigazione Pronto ---")
         print("Comandi: Frecce (XY), W/S (Z), A/D (Yaw), T/G (Decollo/Atterraggio), Q (Esci)")
 
     def comandi(self, key):
@@ -37,14 +45,17 @@ class Drone_Controller:
                 elif key.char == 'g': self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, 0.05))
                 elif key.char == 'q': return False
             
-            # Conversione in coordinate geografiche
+            # Calcolo posizione geodetica corretta
             pos = self.sim.getObjectPosition(self.drone, self.sim.handle_world)
-            lat = self.ref_lat + (pos[0] * self.meters_to_degrees)
-            lon = self.ref_lon + (pos[1] * self.meters_to_degrees)
+            lat = self.ref_lat + (pos[0] / self.LAT_METERS_PER_DEG)
+            
+            # Correzione longitudine in base alla latitudine
+            lon_factor = self.LAT_METERS_PER_DEG * math.cos(math.radians(lat))
+            lon = self.ref_lon + (pos[1] / lon_factor)
             alt = pos[2] 
             
-            # Output formattato
-            print(f"Lat: {lat:.6f} | Lon: {lon:.6f} | Alt: {alt:.2f} m       ", end='\r')
+            print(f"Lat: {lat:.7f} | Lon: {lon:.7f} | Alt: {alt:.2f} m       ", end='\r')
+            
         except: 
             pass
 
@@ -53,4 +64,6 @@ class Drone_Controller:
             listener.join()
 
 if __name__ == "__main__":
-    Drone_Controller().run()ontroller().run()
+    # Avvio del controller
+    controller = Drone_Controller()
+    controller.run()
