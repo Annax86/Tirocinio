@@ -2,7 +2,7 @@ import math
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 from pynput import keyboard
 
-class DJI_Mini3_GeoController:
+class Drone_Controller:
     def __init__(self):
         
         # Connessione al simulatore
