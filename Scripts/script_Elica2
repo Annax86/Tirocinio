@@ -1,0 +1,22 @@
+function sysCall_init()
+    selfHandle = sim.getObject('.')
+    rotSpeed = 100 
+    
+    -- 1. APPLICA L'INCLINAZIONE
+    local degToRad = math.pi/180
+    local tiltX = -15 * degToRad 
+    local tiltZ = 15 * degToRad
+    
+    -- Impostiamo l'assetto iniziale fisso
+    sim.setObjectOrientation(selfHandle, selfHandle, {tiltX, 0, tiltZ})
+end
+
+function sysCall_actuation()
+    local dt = sim.getSimulationTimeStep()
+    
+    -- 2. ROTAZIONE RELATIVA PURA
+    -- Usando sim.handle_self come secondo parametro, la rotazione
+    -- avviene SEMPRE sul perno locale dell'elica, anche se ? inclinata.
+    -- Questo elimina il traballamento.
+    sim.setObjectOrientation(selfHandle, selfHandle, {rotSpeed * dt, 0, 0})
+end
