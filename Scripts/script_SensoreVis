@@ -1,0 +1,35 @@
+function sysCall_init()
+    -- Recupero degli handle necessari
+    camHandle = sim.getObject('.')
+    droneBase = sim.getObject('/Quadcopter_target')
+    
+    -- SPECIFICHE REALI DJI MINI 3:
+    -- Limiti Pitch: da -90 gradi a +60 gradi
+    minPitch = math.rad(-90)
+    maxPitch = math.rad(60)
+    
+    -- Inclinazione desiderata 
+    targetCameraPitch = math.rad(0) 
+end
+
+function sysCall_sensing()
+    -- 1. Lettura dell'assetto del drone nel mondo (Roll, Pitch, Yaw)
+    local droneOri = sim.getObjectOrientation(droneBase, sim.handle_world)
+    local droneYaw = droneOri[3]
+
+    -- 2. SIMULAZIONE GIMBAL (Stabilizzazione Inerziale)
+    -- Il Roll deve essere sempre 0 per avere l'orizzonte dritto
+    local stableRoll = 0
+    
+    -- Il Pitch della camera deve essere indipendente dal Pitch del drone
+    -- Applichiamo un limite di sicurezza per non superare le specifiche reali
+    local stablePitch = math.max(minPitch, math.min(maxPitch, targetCameraPitch))
+    
+    -- Lo Yaw della camera segue la direzione del drone
+    local stableYaw = droneYaw
+
+    -- 3. APPLICAZIONE ASSETTO
+    -- Impostiamo l'orientamento della camera rispetto al mondo (Global Frame)
+    -- Questo "isola" la fotocamera dalle oscillazioni fisiche del drone
+    sim.setObjectOrientation(camHandle, sim.handle_world, {stableRoll, stablePitch, stableYaw})
+end
