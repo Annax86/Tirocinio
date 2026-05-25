@@ -2,22 +2,21 @@ function sysCall_init()
     camSensor = sim.getObject('.')
     cameraBody = sim.getObject('/Camera')
     droneBase = sim.getObject('/Quadcopter_target')
+    
+    -- Inizializziamo le variabili per mantenere i valori
+    currentTilt = 0
 end
 
 function sysCall_sensing()
-    -- Riceviamo il comando 'Tilt' da Python (Tasti R e F)
-    local tilt = sim.getFloatSignal("cameraTilt") or 0
+    -- Riceviamo i comandi da Python
+    local tilt = sim.getFloatSignal("cameraTilt") or currentTilt
     
-    -- Otteniamo l'orientamento del drone
+    -- Aggiorniamo i valori correnti
+    currentTilt = tilt
+    
+    -- Otteniamo l'orientamento del drone (per sincronizzare lo Yaw del drone con la camera)
     local dOri = sim.getObjectOrientation(droneBase, sim.handle_world)
     
-    -- SOLUZIONE AL TUO PROBLEMA:
-    -- Abbiamo spostato 'tilt' sul primo asse (Alpha) o secondo (Beta) 
-    -- per assicurarci che il movimento sia SU/GI? e non DESTRA/SINISTRA.
-    
-    -- Prova questa configurazione (Pitch su Alpha):
-    sim.setObjectOrientation(cameraBody, sim.handle_world, {tilt, 0, dOri[3]})
-    
-    -- NOTA: Se invece di andare su/gi? dovesse inclinarsi di lato (Roll), 
-    -- sposta 'tilt' cos?: {0, tilt, dOri[3]}
+    -- APPLICAZIONE DEI MOVIMENTI:
+    sim.setObjectOrientation(cameraBody, sim.handle_world, {currentTilt, 0, 0})
 end
