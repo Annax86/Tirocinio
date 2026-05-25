@@ -60,6 +60,12 @@ class Drone_Controller:
             pos = self.sim.getObjectPosition(self.drone, self.sim.handle_world)
             ori = self.sim.getObjectOrientation(self.drone, self.sim.handle_world)
             
+            # Legge la distanza dal suolo calcolata dal sensore
+            ground_dist = self.sim.getFloatSignal("ground_distance")
+            if ground_dist is not None and ground_dist > 0: 
+                ground_str = f"{ground_dist:.2f}m"
+            else:
+                ground_str = "Fuori Range (> 5m)"
             # Conversione GNSS
             lat = self.ref_lat + (pos[0] / self.LAT_METERS_PER_DEG)
             lon = self.ref_lon + (pos[1] / (self.LAT_METERS_PER_DEG * math.cos(math.radians(lat))))
@@ -125,12 +131,28 @@ class Drone_Controller:
         if not self.key_pressed: return 
         k = self.key_pressed
         
+        # 1. LETTURA DEI SEGNALI INVIATI DALLO SCRIPT LUA DI COPPELIA
+        max_descent_speed = self.sim.getFloatSignal("max_descent_speed")
+        touchdown_signal = self.sim.getInt32Signal("touchdown_confirmed")
+
+        # Se non sono ancora stati inizializzati, allora
+        if max_descent_speed is None: max_descent_speed = self.STEP_MOVE
+        touchdown_confirmed = True if touchdown_signal == 1 else False
+
         try:
             if hasattr(k, 'char'):
                 # Controllo Quota (Z) (↑/↓)
-                if k.char == 'w': self.sim.setObjectPosition(self.drone, self.drone, (0, 0, self.STEP_MOVE))
-                elif k.char == 's': self.sim.setObjectPosition(self.drone, self.drone, (0, 0, -self.STEP_MOVE))
-                
+                if k.char == 'w':
+                    self.sim.setObjectPosition(self.drone, self.drone, (0, 0, self.STEP_MOVE))
+                    self.sim.setInt32Signal("touchdown_confirmed", 0)
+
+                elif k.char == 's': 
+                    # Applicazione del limite calcolato dal sensore
+                    if not touchdown_confirmed:
+                        # Il passo di discesa non può superare la velocità di sicurezza stabilita
+                        passo_discesa = min(self.STEP_MOVE, max_descent_speed)
+                        self.sim.setObjectPosition(self.drone, self.drone, (0, 0, -passo_discesa))
+
                 # Rotazione (Yaw)
                 elif k.char == 'a': self.sim.setObjectOrientation(self.drone, self.drone, (0, 0, self.STEP_YAW))
                 elif k.char == 'd': self.sim.setObjectOrientation(self.drone, self.drone, (0, 0, -self.STEP_YAW))
@@ -157,7 +179,10 @@ class Drone_Controller:
 
                 # Funzioni Rapide e Modalità
                 elif k.char == 't': self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, 1.0))
-                elif k.char == 'g': self.sim.setObjectPosition(self.drone, self.sim.handle_world, (0, 0, 0.05))
+                elif k.char == 'g':
+                    if not touchdown_confirmed:
+                        passo_discesa = min(self.STEP_MOVE, max_descent_speed) 
+                        self.sim.setObjectPosition(self.drone, self.drone, (0, 0, -passo_discesa))
                 elif k.char == 'p':
                     self.waypoint_mode = not self.waypoint_mode
                     print(f"\n[AUTO] {'ON' if self.waypoint_mode else 'OFF'}")
